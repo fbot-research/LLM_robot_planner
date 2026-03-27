@@ -2,188 +2,111 @@ from typing import Dict, Optional
 import json
 import logging
 import ollama
+# from agent import parse_ai_response
 
 logger = logging.getLogger(__name__)
 
+# Default Ollama host used to create the client. Can be overridden in
+# a production deployment via environment variables or a config file.
 host = "http://localhost:11434"
 
-model = "granite4:3b"
+# model = "granite4:3b"
+model = "llama3.1:8b"
 # model = "gemma3:4b"
 
 client = ollama.Client(host=host)
 
 
-def parse_ai_response(response_text: str) -> Optional[Dict]:
-    """Tenta parsear a resposta da IA como JSON"""
+
+
+def call_ros(command: str) -> str:
+    """Execute a ROS 2 CLI command and return its standard output.
+
+    This is a thin wrapper around ``subprocess.run`` intended for use in
+    prototyping and tests. It invokes the ``ros2`` CLI; in production code
+    consider using a ROS client library instead of shelling out.
+
+    :param command: The ROS 2 CLI command arguments (e.g. ``"topic list"``).
+    :return: The captured stdout from the command, or an error message if the
+             call failed.
+    """
+    import subprocess
+
     try:
-        # Tenta encontrar JSON na resposta
-        json_match = None
-
-        # Primeiro tenta parsear diretamente
-        try:
-            return json.loads(response_text)
-        except json.JSONDecodeError:
-            pass
-
-        # Tenta encontrar bloco JSON
-        import re
-
-        json_patterns = [r"```json\s*(.*?)\s*```", r"```\s*(.*?)\s*```", r"(\{.*\})"]
-
-        for pattern in json_patterns:
-            match = re.search(pattern, response_text, re.DOTALL)
-            if match:
-                try:
-                    return json.loads(match.group(1))
-                except json.JSONDecodeError:
-                    continue
-
-        logger.warning("Could not parse AI response as JSON — will ask LLM to reformat")
-        return None
-
+        result = subprocess.run(
+            f"ros2 {command}", capture_output=True, text=True, shell=True
+        )
+        print(result.stdout)
+        return result.stdout
     except Exception as e:
-        logger.error(f"Error parsing AI response: {e}")
-        return None
+        logger.error(f"Error calling ROS command: {e}")
+        print(f"Error calling ROS command: {e}")
+        return f"Error calling ROS command: {e}"
+
+# Import tools, examples, persona and rules from separate files to keep this main script clean
 
 
-tools = [
-    {
-        "name": "move_arm",
-        "description": "Move the robotic arm to a specified position.",
-        "parameters": {
-            "position": "The target position for the arm, specified as x, y, z coordinates."
-        },
-    },
-    {
-        "name": "close_gripper",
-        "description": "Close the gripper to grip an object at the current position.",
-        "parameters": {},
-    },
-    {
-        "name": "open_gripper",
-        "description": "Open the gripper to release any currently gripped object at the current position.",
-        "parameters": {},
-    },
-    {
-        "name": "navigate_to",
-        "description": "Navigate the robotic system to a specified absolute location.",
-        "parameters": {
-            "location": "The target location, specified as x, y, z coordinates.",
-            "orientation": "The target orientation, specified as a quaternion.",
-        },
-    },
-    {
-        "name": "ask_for_help",
-        "description": "Ask for human assistance if the task is too complex or if there are issues.",
-        "parameters": {"message": "A message describing the issue or the help needed."},
-    },
-    {
-        "name": "call_moveit",
-        "description": "Call the MoveIt motion planning framework to plan and execute a motion.",
-        "parameters": {
-            "target_position": "The target position for the motion, specified as x, y, z coordinates.",
-            "target_orientation": "The target orientation for the motion, specified as a quaternion.",
-        },
-    },
-    {
-        "name": "call_ros",
-        "description": "Call a ROS command",
-        "parameters": {"command": "<string command_name> <args>"},
-    },
-    {
-        "name": "end_iteration",
-        "description": "Indicates that the current iteration of the task is complete and the system can evaluate the results and decide on the next steps.",
-        "parameters": {},
-    },
-    {
-        "name": "end_task",
-        "description": "Indicates that the task is complete and no further actions are needed.",
-        "parameters": {},
-    }
-]
+with open("settings/rules.md", "r") as f:
+    rules = f.read()
 
-rules = """
-1. You must follow the context provided in the prompt and use the tools at your disposal to take an action.
-2. Always evaluate the context and the prompt carefully before deciding which tools to use.
-3. If the prompt is unclear or ambiguous, ask for clarification before taking any action.
-4. Ensure that all actions taken are safe and do not cause harm to the robotic system or its surroundings.
-5. If you encounter any issues or errors while using the tools, report them immediately and seek assistance if necessary.
-6. You can chain multiple tool actions together to achieve a complex task, but always ensure that each action is valid and necessary for the task at hand.
-"""
+with open("settings/examples.md", "r") as f:
+    examples = f.read()
 
-system_prompt = f"""You are AutoBot AI, an expert robotics controller.
-Your task is to control robotic systems to perform various tasks based on a context and a given prompt.
-evaluate the context and the prompt to determine the best course of action for the robotic system.
-The tools at your disposal include:
-{tools}
+with open("settings/persona.md", "r") as f:
+    persona = f.read()
 
-RULES:
+import tools
+
+for tool in tools:
+    print(f"Loaded tool: {tool['name']} - {tool['description']} with parameters {tool['parameters']}")
+
+
+system_prompt = f"""
+{persona}
+
+<rules>
 {rules}
+</rules>
 
-RESPONSE FORMAT - You MUST respond with valid JSON only:
-{{
-[
-{{
-    "action": "tool_name",
-    "parameters": {{"param1": "value1", "param2": "value2"}}
-}},
-{{
-    "action": "tool_name",
-    "parameters": {{"param1": "value1", "param2": "value2"}}
-}}
-]
-}}
+<tools>
+{tools}
+</tools>
 
+<examples>
+{examples}
+</examples>
+
+RESPONSE FORMAT:
+You MUST respond with a single valid JSON array containing the sequence of actions. Do not wrap it in markdown code blocks if possible, just output the raw JSON.
 """
 
-map_pgm_data = (
-    "P2\n# Example map PGM file\n4 4\n255\n0 0 0 0\n0 255 255 0\n0 255 255 0\n0 0 0 0"
-)
+# TODO: get the current state from ROS topics instead of hardcoding it here. This is just an example.
+current_state = {
+    "current_position": {"x": 0.0, "y": 0.0, "z": 0.0},
+    "current_orientation": {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0},
+    "gripped_object": None,
+    "gripper_state": "open",
+    "environment": {
+        "objects": [
+            {"id": "object1", "type": "box", "position": {"x": 1.0, "y": 1.0, "z": 0.0}}
+        ],
+    }
+}
 
-context = f"""
-All the dimensions are in meters. Use the provided tools to achieve the task.
-Always ensure that your actions are safe and valid based on the context and the rules provided.
-Never hit an object or obstacle and ensure to grip the object securely before moving it.
-If you are unsure about the task or the context, ask for clarification before taking any action.
-if unsure about what to do, you can run ROS commands to check the state of the robot and the environment.
-
-EXAMPLE:
-
-# If you know about all the needed context
-command = "pick the red ball"
-actions_taken = ["navigate_to (0.5, 0.5, 0.0)", "move_arm (1.0, 1.0, 0.05)", "close_gripper", "move_arm (0.0, 0.0, 0.3)"]
-
-#If you don't know about the something in the context or the prompt is ambiguous
-command = "pick the red ball and place it on the table"
-actions_taken = ["call_ros (topic list)", "end_iteration"]
-response = "/detected_objects, /cmd_vel, /joint_states, /gripper_state, /arena_poses"
-actions_taken = ["call_ros (topic echo /detected_objects)", "call_ros (topic echo /arena_poses)", "end_iteration"]
-response = "object1: type=box, position=(1.0, 1.0, 0.0); object2: type=ball, position=(0.5, 0.5, 0.0) | arena_poses: table=(3.0, 4.3, 0.0); shelf=(5.0, 2.0, 0.0)"
-actions_taken = ["navigate_to (0.4, 0.4, 0.0)", "move_arm (0.5, 0.5, 0.05)", "close_gripper", "move_arm (0.0, 0.0, 0.3)", "navigate_to (3.0, 4.3, 0.0)", "move_arm (0.0, 0.0, -0.05)", "open_gripper", "move_arm (0.0, 0.0, 0.3)"]
-
-# have in mind these are EXAMPLES and not strict rules, the topic names can be different and the actions can be in a different order, the important thing is to follow the rules and use the tools to achieve the task based on the context and the prompt.
-
-{{
-"current_position": {{"x": 0.0, "y": 0.0, "z": 0.0}},
-"current_orientation": {{"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0}},
-"gripped_object": null,
-"gripper_state": "open",
-"environment": {{
-    "objects": [
-        {{"id": "object1", "type": "box", "position": {{"x": 1.0, "y": 1.0, "z": 0.0}} }}
-    ],
-}}
-    
-}}
-"""
-
-user_prompt = "Pick the box and place it on the table"
+user_prompt = "Pick up the box and move it to the left side of the table."
 
 built_msg = f"""
-CONTEXT: {context}
 
-DESIRED ACTION: {user_prompt}
+<current_state>
+{json.dumps(current_state, indent=2)}
+</current_state>
+
+<user_request>
+{user_prompt}
+</user_request>
 """
+
+# print(built_msg)
 
 print("Sending prompt to LLM...")
 print("System Prompt:")
@@ -193,42 +116,55 @@ print(built_msg)
 
 resp = client.chat(
     model=model,
+    # format="json",
     messages=[
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": built_msg},
     ],
 )
 
-print(f"{'\n'*5}LLM Response:")
+# print(f"{'\n'*5}LLM Response:")
 parsed_resp = parse_ai_response(str(resp.message.content))
 
 if parsed_resp is not None:
+    json.dumps(parsed_resp, indent=2)
+    print("Parsed LLM response as JSON:")
     print(json.dumps(parsed_resp, indent=2))
-
+    print(f"\n{'-'*50}\n")
+    print(resp.message.content)
 else:
     print("Could not parse LLM response as JSON. Raw response:")
-    print(resp)
+    print(resp.message.content)
+    pass
 
+# for action in parsed_resp:
+#     try:
+#         assert (
+#             "action" in action
+#         ), "Each item in the response must have an 'action' key"
+#         # print(action)
+#         print(
+#             f"Executing action: {action['action']}"
+#             + (
+#                 f"with parameters: {action['parameters']}"
+#                 if hasattr(action, "parameters")
+#                 else ""
+#             )
+#         ) 
+#         if action["action"] == "call_ros":
+#             command = action["parameters"]["command"]
+#             ros_response = call_ros(command)
+#             print(f"ROS response: {ros_response}")
 
+#     except AssertionError as ae:
+#         logger.error(f"Invalid action format: {action} - {ae}")
+#         print(f"Invalid action format: {action} - {ae}")
+#         continue
 
-
-# Tools:
-
-
-def call_ros(command: str) -> str:
-    # Aqui você implementaria a lógica para chamar um comando ROS e retornar a resposta
-    # Por exemplo, usando subprocess para chamar um comando no terminal
-    import subprocess
-
-    try:
-        result = subprocess.run(command.split(), capture_output=True, text=True)
-        print(result.stdout)
-        return result.stdout
-    except Exception as e:
-        logger.error(f"Error calling ROS command: {e}")
-        print(f"Error calling ROS command: {e}")
-        return f"Error calling ROS command: {e}"
-
+#     except Exception as e:
+#         logger.error(f"Error executing action {action}: {e}")
+#         print(f"Error executing action {action}: {e}")
+#         continue
 
 with open("response.json", "w") as f:
     if hasattr(resp, "model_dump"):
