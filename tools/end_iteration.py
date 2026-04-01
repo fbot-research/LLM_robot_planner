@@ -1,13 +1,10 @@
-tools =  {
-        "name": "end_iteration",
-        "description": "Indicates that the current iteration of the task is complete and the system must wait for environment feedback before proceeding.",
-        "parameters": {},
-    }
+from pydantic import BaseModel, Field
+from tool_registry import tool
 
-implementation = {
-    "end_iteration": lambda: end_iteration()
-    }
+class EndIterationSchema(BaseModel):
+    pass  # No parameters needed for this simple command
 
+@tool(args_schema=EndIterationSchema)
 def end_iteration():
-    #current base for and_iteration tool development
-    print("End of iteration. Waiting for environment feedback...")
+    print("Iteration ended.")
+    return {"status": "success", '__control__': 'end_iteration'}

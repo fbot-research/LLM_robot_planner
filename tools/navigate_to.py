@@ -1,19 +1,13 @@
-tools = {
-    "name": "navigate_to",
-    "description": "Navigate the robotic base to a specified absolute location in the map.",
-    "parameters": {
-        "x": "float, target x coordinate",
-        "y": "float, target y coordinate",
-        "z": "float, target z coordinate",
-        "orientation_q": "array of 4 floats, quaternion [x, y, z, w]",
-    },
-}
+from pydantic import BaseModel, Field
+from tool_registry import tool
 
-implementation = {
-    "navigate_to": lambda x, y, z, orientation_q: navigate_to(x, y, z, orientation_q),
-}
+class NavigateToSchema(BaseModel):
+    x: float = Field(..., description="Target x coordinate")
+    y: float = Field(..., description="Target y coordinate")
+    z: float = Field(..., description="Target z coordinate")
+    orientation: list[float] = Field(..., description="Quaternion [x, y, z, w]")
 
-def navigate_to(x, y, z, orientation_q):
-    # This function would contain the logic to send navigation commands to the robotic base.
-    # For example, it could use ROS (Robot Operating System) to publish a goal to the navigation stack.
-    print(f"Navigating to coordinates: ({x}, {y}, {z}) with orientation (quaternion): {orientation_q}")
+@tool(args_schema=NavigateToSchema)
+def navigate_to(x: float, y: float, z: float, orientation: list[float]):
+    print(f"Navigating to coordinates: ({x}, {y}, {z}) with orientation (quaternion): {orientation}")
+    return {"status": "success", '__control__': 'continue'}

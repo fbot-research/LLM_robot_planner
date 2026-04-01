@@ -1,58 +1,34 @@
-# Tools for ROS2 operations
-from fastapi import logger
+from pydantic import BaseModel, Field
+from tool_registry import tool
+from subprocess import run
 
+class ROSCommandSchema(BaseModel):
+    parameters: dict = Field({}, description="Parameters for the ROS command, if applicable.")
 
-tools = [
-    {
-        "name": "list_topics",
-        "description": "List all available ROS topics.",
-        "parameters": {}
-    },
-    {
-        "name": "publish",
-        "description": "Publish a message to a ROS topic. Useful for sending commands or data to the robot.",
-        "parameters": {
-            "topic": "string, the ROS topic to publish to (e.g., '/cmd_vel').",
-            "message": "string, the message to publish (e.g., 'linear: 0.5, angular: 0.0')."
-        }
-    },
-    {
-        "name": "call_service",
-        "description": "Call a ROS service to perform an action or get information. Useful for interacting with ROS services that control robot behavior or query state.",
-        "parameters": {
-            "service": "string, the ROS service to call (e.g., '/move_base/move').",
-            "request": "string, the request message to send to the service (e.g., 'target_pose: {x: 1.0, y: 0.  0}')."
-        }
-    }
-]
+@tool(args_schema=ROSCommandSchema)
+def list_topics(parameters: dict):
+    run('ros2 topic list', shell=True, check=True)
 
-implementation = {
-    "list_topics": lambda: list_ros_topics(),
-    "publish": lambda topic, message: publish_ros_message(topic, message),
-    "call_service": lambda service, request: call_ros_service(service, request),
-}
+@tool(args_schema=ROSCommandSchema)
+def echo_topic(parameters: dict):
+    topic = parameters.get("topic")
+    if not topic:
+        return "Error: 'topic' parameter is required."
+    run(f'ros2 topic echo {topic} --once', shell=True, check=True)
 
-def call_ros_command(command: str) -> str:
-    """Execute a ROS command and return its output as a string."""
-    import subprocess
+@tool(args_schema=ROSCommandSchema)
+def publish(parameters: dict):
+    topic = parameters.get("topic")
+    message = parameters.get("message")
+    if not topic or not message:
+        return "Error: 'topic' and 'message' parameters are required."
+    run(f'ros2 topic pub {topic} "{message}"', shell=True, check=True)
 
-    try:
-        result = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        return result.stdout.decode('utf-8')
-    except subprocess.CalledProcessError as e:
-        logger.error(f"ROS command failed: {e.stderr.decode('utf-8')}")
-        return f"Error calling ROS command: {e.stderr.decode('utf-8')}"
+@tool(args_schema=ROSCommandSchema)
+def call_service(parameters: dict):
+    service = parameters.get("service")
+    request = parameters.get("request")
+    if not service or not request:
+        return "Error: 'service' and 'request' parameters are required."
+    run(f'ros2 service call {service} "{request}"', shell=True, check=True)
 
-def list_ros_topics():
-    """List all available ROS topics."""
-    return call_ros_command("ros2 topic list")
-
-def publish_ros_message(topic: str, message: str):
-    """Publish a message to a ROS topic."""
-    command = f"ros2 topic pub {topic} {message}"
-    return call_ros_command(command)
-
-def call_ros_service(service: str, request: str):
-    """Call a ROS service with a request message."""
-    command = f"ros2 service call {service} {request}"
-    return call_ros_command(command)

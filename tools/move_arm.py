@@ -1,19 +1,17 @@
-tools = {
-        "name": "move_arm",
-        "description": "Move the robotic arm to a specified position in meters.",
-        "parameters": {
-            "x": "float, target x coordinate",
-            "y": "float, target y coordinate",
-            "z": "float, target z coordinate"
-        }
-    }
+from pydantic import BaseModel, Field
+from tool_registry import tool
 
-implementation = {
-        "move_arm": lambda x, y, z, quaternion: move_arm(x, y, z, quaternion)
-}
+class MoveArmSchema(BaseModel):
+    x: float = Field(..., description="Target x coordinate in meters")
+    y: float = Field(..., description="Target y coordinate in meters")
+    z: float = Field(..., description="Target z coordinate in meters")
+    orientation: list[float] | None = Field(None, description="Orientation as a quaternion [x, y, z, w]")
 
-def move_arm(x, y, z, quaternion):
-    # Here you would implement the actual logic to move the robotic arm
-    # For demonstration purposes, we'll just print the target position and orientation
-    print(f"Moving arm to position: ({x}, {y}, {z}) with orientation (quaternion): {quaternion}")
-    # You can add code here to interface with your robotic arm's control system
+@tool(args_schema=MoveArmSchema)
+def move_arm(x: float, y: float, z: float, orientation: list[float] | None = None):
+    """Move the arm to a specified pose in meters.
+    """
+    # Aqui você pode implementar a lógica para enviar comandos ROS para mover o braço.
+    # Por exemplo, usando ros2 service call ou publicando em um tópico específico.
+    print(f"Moving arm to position: x={x}, y={y}, z={z} with orientation {orientation if orientation else 'default'}")
+    return {"status": "success", '__control__': 'continue'}

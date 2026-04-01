@@ -2,6 +2,9 @@ from typing import Dict, Optional
 import json
 import logging
 import ollama
+import os
+import importlib
+from tool_registry import get_tools_schema, execute_tool
 # from agent import parse_ai_response
 
 logger = logging.getLogger(__name__)
@@ -55,11 +58,14 @@ with open("settings/examples.md", "r") as f:
 with open("settings/persona.md", "r") as f:
     persona = f.read()
 
-import tools
+for filename in os.listdir("tools"):
+    if filename.endswith(".py") and filename != "__init__.py":
+        filepath = os.path.join("tools", filename)
+        spec = importlib.util.spec_from_file_location(filename[:-3], filepath)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
 
-for tool in tools:
-    print(f"Loaded tool: {tool['name']} - {tool['description']} with parameters {tool['parameters']}")
-
+tools_for_llm = json.dumps(get_tools_schema(), indent=2)
 
 system_prompt = f"""
 {persona}
@@ -69,7 +75,7 @@ system_prompt = f"""
 </rules>
 
 <tools>
-{tools}
+{tools_for_llm}
 </tools>
 
 <examples>
@@ -108,68 +114,84 @@ built_msg = f"""
 
 # print(built_msg)
 
-print("Sending prompt to LLM...")
-print("System Prompt:")
-print(system_prompt)
-print("\nUser Prompt:")
-print(built_msg)
+print(f"Sending prompt to {model}...")
+# print("System Prompt:")
+# print(system_prompt)
+# print("\nUser Prompt:")
+# print(built_msg)
 
-resp = client.chat(
-    model=model,
-    # format="json",
-    messages=[
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": built_msg},
-    ],
-)
+finished = False
 
-# print(f"{'\n'*5}LLM Response:")
-parsed_resp = parse_ai_response(str(resp.message.content))
+action_history = []
 
-if parsed_resp is not None:
-    json.dumps(parsed_resp, indent=2)
-    print("Parsed LLM response as JSON:")
-    print(json.dumps(parsed_resp, indent=2))
-    print(f"\n{'-'*50}\n")
-    print(resp.message.content)
-else:
-    print("Could not parse LLM response as JSON. Raw response:")
-    print(resp.message.content)
-    pass
+while not finished:
 
-# for action in parsed_resp:
-#     try:
-#         assert (
-#             "action" in action
-#         ), "Each item in the response must have an 'action' key"
-#         # print(action)
-#         print(
-#             f"Executing action: {action['action']}"
-#             + (
-#                 f"with parameters: {action['parameters']}"
-#                 if hasattr(action, "parameters")
-#                 else ""
-#             )
-#         ) 
-#         if action["action"] == "call_ros":
-#             command = action["parameters"]["command"]
-#             ros_response = call_ros(command)
-#             print(f"ROS response: {ros_response}")
+    resp = client.chat(
+        model=model,
+        format="json",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": built_msg},
+        ],
+    )
 
-#     except AssertionError as ae:
-#         logger.error(f"Invalid action format: {action} - {ae}")
-#         print(f"Invalid action format: {action} - {ae}")
-#         continue
+    plan = parse_ai_response(str(resp.message.content))
 
-#     except Exception as e:
-#         logger.error(f"Error executing action {action}: {e}")
-#         print(f"Error executing action {action}: {e}")
-#         continue
 
-with open("response.json", "w") as f:
-    if hasattr(resp, "model_dump"):
-        json.dump(resp.model_dump(), f, indent=2, ensure_ascii=False)
-    elif isinstance(resp, dict):
-        json.dump(resp, f, indent=2, ensure_ascii=False, default=str)
+    if plan is not None:
+        json.dumps(plan, indent=2)
+        print("Parsed LLM response as JSON:")
+        print(json.dumps(plan, indent=2))
+        # print(f"\n{'-'*50}\n")
+        # print(resp.message.content)
     else:
-        f.write(str(resp))
+        print("Could not parse LLM response as JSON. Raw response:")
+        print(resp.message.content)
+        
+        # TODO: ask the LLM to reformat
+        
+        pass
+
+    if isinstance(plan, dict): 
+        if "action" in plan:
+            plan = [plan]  # Wrap single action in a list for uniform processing
+        elif 'actions' in plan:
+            plan = plan['actions']  # Extract actions list if wrapped in an "actions" field
+        else:
+            print("LLM response JSON does not contain 'action' or 'actions' field. Raw response:")
+            print(resp.message.content)
+            plan = []  # Set to empty list to avoid processing
+
+    for step in plan:
+        action_name = step.get("action")
+        params = step.get("parameters", {})
+        result = execute_tool(action_name, params)
+        
+        print(f"Result: {result}")
+        action_history.append((action_name, params, result))
+
+        system_prompt += f"""
+        <command_history>
+        {json.dumps(action_history, indent=2)}
+        </command_history>
+        """
+
+        if result.get('__control__') == 'end_task':
+            finished = True
+            break
+        elif result.get('__control__') == 'end_iteration':
+            # Here you could also update the current_state based on the results of the command if needed
+            break  # Break to send the updated context back to the LLM for the next iteration
+        
+
+        print(f"\n{'='*50}\n")
+
+        
+
+    with open("debug/raw_response.json", "w") as f:
+        if hasattr(resp, "model_dump"):
+            json.dump(resp.model_dump(), f, indent=2, default=str)
+        elif isinstance(resp, dict):
+            json.dump(resp, f, indent=2, default=str)
+        else:
+            f.write(str(resp))
