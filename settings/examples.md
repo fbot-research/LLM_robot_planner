@@ -38,7 +38,15 @@ Response:
         "parameters": {}
     }
 ]
-The command returns "/feedback\n/parameter_events\n/rosout\n/arena_poses\n/detected_objects". You receive this context, previsously executed commands, and answer:
+The command returns "
+/feedback
+/parameter_events
+/rosout
+/arena_poses
+/detected_objects
+".
+You receive this context, previsously executed commands, and answer:
+
 [
     {
         "action": "call_ros",
