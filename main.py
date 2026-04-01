@@ -1,11 +1,10 @@
-from typing import Dict, Optional
 import json
 import logging
 import ollama
 import os
 import importlib
 from tool_registry import get_tools_schema, execute_tool
-# from agent import parse_ai_response
+from agent import parse_ai_response
 
 logger = logging.getLogger(__name__)
 
@@ -15,12 +14,11 @@ host = "http://localhost:11434"
 
 # model = "granite4:3b"
 model = "llama3.1:8b"
+model = "qwen3.5:9b"
+# model = 'aiasistentworld/Llama-3.1-8B-Instruct-STO-Master:latest'
 # model = "gemma3:4b"
 
 client = ollama.Client(host=host)
-
-
-
 
 def call_ros(command: str) -> str:
     """Execute a ROS 2 CLI command and return its standard output.
@@ -45,9 +43,6 @@ def call_ros(command: str) -> str:
         logger.error(f"Error calling ROS command: {e}")
         print(f"Error calling ROS command: {e}")
         return f"Error calling ROS command: {e}"
-
-# Import tools, examples, persona and rules from separate files to keep this main script clean
-
 
 with open("settings/rules.md", "r") as f:
     rules = f.read()
@@ -84,6 +79,20 @@ system_prompt = f"""
 
 RESPONSE FORMAT:
 You MUST respond with a single valid JSON array containing the sequence of actions. Do not wrap it in markdown code blocks if possible, just output the raw JSON.
+Your response must be in this format, with no additional text or formatting:
+[
+    {{
+        "action": "tool_name",
+        "parameters": {{
+            "param1": "value1",
+            "param2": "value2"
+        }}
+    }},
+    {{
+        "action": "another_tool",
+        "parameters": {{}}
+    }}
+]
 """
 
 # TODO: get the current state from ROS topics instead of hardcoding it here. This is just an example.
@@ -99,7 +108,7 @@ current_state = {
     }
 }
 
-user_prompt = "Pick up the box and move it to the left side of the table."
+user_prompt = "goto a random position"
 
 built_msg = f"""
 
@@ -195,3 +204,6 @@ while not finished:
             json.dump(resp, f, indent=2, default=str)
         else:
             f.write(str(resp))
+
+    with open("debug/response.txt", 'w') as f:
+        f.write(str(resp.message.content))
