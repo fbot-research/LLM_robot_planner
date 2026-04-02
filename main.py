@@ -44,14 +44,8 @@ def call_ros(command: str) -> str:
         print(f"Error calling ROS command: {e}")
         return f"Error calling ROS command: {e}"
 
-with open("settings/rules.md", "r") as f:
-    rules = f.read()
-
-with open("settings/examples.md", "r") as f:
-    examples = f.read()
-
-with open("settings/persona.md", "r") as f:
-    persona = f.read()
+with open("settings/prompt.md", "r") as f:
+    prompt = f.read()
 
 for filename in os.listdir("tools"):
     if filename.endswith(".py") and filename != "__init__.py":
@@ -62,38 +56,7 @@ for filename in os.listdir("tools"):
 
 tools_for_llm = json.dumps(get_tools_schema(), indent=2)
 
-system_prompt = f"""
-{persona}
-
-<rules>
-{rules}
-</rules>
-
-<tools>
-{tools_for_llm}
-</tools>
-
-<examples>
-{examples}
-</examples>
-
-RESPONSE FORMAT:
-You MUST respond with a single valid JSON array containing the sequence of actions. Do not wrap it in markdown code blocks if possible, just output the raw JSON.
-Your response must be in this format, with no additional text or formatting:
-[
-    {{
-        "action": "tool_name",
-        "parameters": {{
-            "param1": "value1",
-            "param2": "value2"
-        }}
-    }},
-    {{
-        "action": "another_tool",
-        "parameters": {{}}
-    }}
-]
-"""
+system_prompt = f"""{prompt}"""
 
 # TODO: get the current state from ROS topics instead of hardcoding it here. This is just an example.
 current_state = {
@@ -112,13 +75,13 @@ user_prompt = "goto a random position"
 
 built_msg = f"""
 
-<current_state>
+<|current_state|>
 {json.dumps(current_state, indent=2)}
-</current_state>
+<|current_state|>
 
-<user_request>
+<|user_request|>
 {user_prompt}
-</user_request>
+<|user_request|>
 """
 
 # print(built_msg)
@@ -180,9 +143,9 @@ while not finished:
         action_history.append((action_name, params, result))
 
         system_prompt += f"""
-        <command_history>
+        <|command_history|>
         {json.dumps(action_history, indent=2)}
-        </command_history>
+        <|command_history|>
         """
 
         if result.get('__control__') == 'end_task':
