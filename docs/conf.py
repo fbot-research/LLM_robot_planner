@@ -1,23 +1,38 @@
-# Minimal Sphinx conf.py for Read the Docs and autodoc
-
 import os
 import sys
-sys.path.insert(0, os.path.abspath(".."))  # permite importar o pacote/module raiz
+sys.path.insert(0, os.path.abspath('..'))
 
-project = "AutoBot"
-author = "AutoBot Team"
-release = "0.1"
+# Configuration file for the Sphinx documentation builder.
+#
+# For the full list of built-in configuration values, see the documentation:
+# https://www.sphinx-doc.org/en/master/usage/configuration.html
+
+# -- Project information -----------------------------------------------------
+# https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
+
+project = 'LLM Robot Planner'
+copyright = '2026, FBOT@Research'
+author = 'FBOT@Research'
+release = '0.1'
+
+# -- General configuration ---------------------------------------------------
+# https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
-    "sphinx.ext.autodoc",
-    "sphinx.ext.napoleon",
-    "sphinx.ext.viewcode",
+    'myst_parser',
+    'sphinx.ext.autodoc',
+    'sphinx.ext.napoleon',
+    'sphinx.ext.viewcode',
+    'sphinx.ext.intersphinx',
+    'sphinxcontrib.youtube'
 ]
 
-templates_path = ["_templates"]
-html_theme = "sphinx_rtd_theme"
-html_static_path = ["_static"]
+templates_path = ['_templates']
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
-# Autodoc options
-autodoc_member_order = "bysource"
-autodoc_typehints = "signature"
+
+# -- Options for HTML output -------------------------------------------------
+# https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
+
+html_theme = 'sphinx_rtd_theme'
+html_static_path = ['_static']
