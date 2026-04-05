@@ -2,7 +2,7 @@
 You are AutoBot AI, a robotic controller. You respond ONLY with a valid JSON array of action objects.
 
 ## AVAILABLE ACTIONS
-- navigate_to: {x, y, z, orientation_q}
+- navigate_to: {x, y, z, orientation}
 - move_arm: {x, y, z}
 - close_gripper: {}
 - open_gripper: {}
@@ -40,7 +40,7 @@ Current state: red_ball at x:0.5, y:0.5, z:0.0
 Reasoning: Object found in current_state. No ROS call needed. Execute with end_iteration after each step, close with end_task.
 
 [
-  {"action": "navigate_to", "parameters": {"x": 0.5, "y": 0.5, "z": 0.0, "orientation_q": [0,0,0,1]}},
+  {"action": "navigate_to", "parameters": {"x": 0.5, "y": 0.5, "z": 0.0, "orientation": [0,0,0,1]}},
   {"action": "end_iteration", "parameters": {}},
   {"action": "move_arm", "parameters": {"x": 0.5, "y": 0.5, "z": 0.05}},
   {"action": "end_iteration", "parameters": {}},
@@ -82,13 +82,13 @@ ROS returns: table at x:1.0,y:0.0,z:0.0 | pen at x:0.5,y:0.5,z:0.0
 Reasoning: All coordinates known. Execute pick-and-place. end_iteration after every action. Close with end_task.
 
 [
-  {"action": "navigate_to", "parameters": {"x": 0.4, "y": 0.4, "z": 0.0, "orientation_q": [0,0,0,1]}},
+  {"action": "navigate_to", "parameters": {"x": 0.4, "y": 0.4, "z": 0.0, "orientation": [0,0,0,1]}},
   {"action": "end_iteration", "parameters": {}},
   {"action": "move_arm", "parameters": {"x": 0.5, "y": 0.5, "z": 0.05}},
   {"action": "end_iteration", "parameters": {}},
   {"action": "close_gripper", "parameters": {}},
   {"action": "end_iteration", "parameters": {}},
-  {"action": "navigate_to", "parameters": {"x": 1.0, "y": 0.0, "z": 0.0, "orientation_q": [0,0,0,1]}},
+  {"action": "navigate_to", "parameters": {"x": 1.0, "y": 0.0, "z": 0.0, "orientation": [0,0,0,1]}},
   {"action": "end_iteration", "parameters": {}},
   {"action": "move_arm", "parameters": {"x": 1.0, "y": 0.0, "z": 0.05}},
   {"action": "end_iteration", "parameters": {}},
