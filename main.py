@@ -13,36 +13,12 @@ logger = logging.getLogger(__name__)
 host = "http://localhost:11434"
 
 # model = "granite4:3b"
-model = "llama3.1:8b"
 model = "qwen3.5:9b"
+model = "llama3.1:8b"
 # model = 'aiasistentworld/Llama-3.1-8B-Instruct-STO-Master:latest'
 # model = "gemma3:4b"
 
 client = ollama.Client(host=host)
-
-def call_ros(command: str) -> str:
-    """Execute a ROS 2 CLI command and return its standard output.
-
-    This is a thin wrapper around ``subprocess.run`` intended for use in
-    prototyping and tests. It invokes the ``ros2`` CLI; in production code
-    consider using a ROS client library instead of shelling out.
-
-    :param command: The ROS 2 CLI command arguments (e.g. ``"topic list"``).
-    :return: The captured stdout from the command, or an error message if the
-             call failed.
-    """
-    import subprocess
-
-    try:
-        result = subprocess.run(
-            f"ros2 {command}", capture_output=True, text=True, shell=True
-        )
-        print(result.stdout)
-        return result.stdout
-    except Exception as e:
-        logger.error(f"Error calling ROS command: {e}")
-        print(f"Error calling ROS command: {e}")
-        return f"Error calling ROS command: {e}"
 
 with open("settings/prompt.md", "r") as f:
     prompt = f.read()
@@ -68,10 +44,13 @@ current_state = {
         "objects": [
             {"id": "object1", "type": "box", "position": {"x": 1.0, "y": 1.0, "z": 0.0}}
         ],
+        "places": [
+            {"id": "place1", "type": "table", "position": {"x": 2.0, "y": 2.0, "z": 0.0}}
+        ]
     }
 }
 
-user_prompt = "goto a random position"
+user_prompt = "Get the tagged object on the "
 
 built_msg = f"""
 
@@ -85,7 +64,7 @@ built_msg = f"""
 """
 
 # print(built_msg)
-
+print(f"Task: {user_prompt}")
 print(f"Sending prompt to {model}...")
 # print("System Prompt:")
 # print(system_prompt)
@@ -93,6 +72,8 @@ print(f"Sending prompt to {model}...")
 # print(built_msg)
 
 finished = False
+iteration_counter = 0
+iteration_limit = 25
 
 action_history = []
 
@@ -135,6 +116,7 @@ while not finished:
             plan = []  # Set to empty list to avoid processing
 
     for step in plan:
+        iteration_counter += 1
         action_name = step.get("action")
         params = step.get("parameters", {})
         result = execute_tool(action_name, params)
@@ -155,10 +137,13 @@ while not finished:
             # Here you could also update the current_state based on the results of the command if needed
             break  # Break to send the updated context back to the LLM for the next iteration
         
-
+        print(f"\n{'-'*50}\n")
+        print(f"Iteration {iteration_counter} completed. Sending updated context back to LLM for next iteration...")
         print(f"\n{'='*50}\n")
 
-        
+    if iteration_counter >= iteration_limit:
+        print("Iteration limit reached. Ending execution.")
+        finished = True
 
     with open("debug/raw_response.json", "w") as f:
         if hasattr(resp, "model_dump"):
@@ -170,3 +155,5 @@ while not finished:
 
     with open("debug/response.txt", 'w') as f:
         f.write(str(resp.message.content))
+
+print("Finished executing plan.")
