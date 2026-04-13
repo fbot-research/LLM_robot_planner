@@ -1,0 +1,6 @@
+# Applications
+
+In here we will be describing further the  applications and advantages of using  and LLM for planning over the usual State Machine. For example, an LLM can have more flexibility during the need of a recovery process...
+
+
+The next move is to further expand this model of action planning for robots that actuate in competitions like RoboCup...
