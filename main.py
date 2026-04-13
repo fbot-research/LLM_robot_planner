@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 host = "http://localhost:11434"
 
 # model = "granite4:3b"
-model = "qwen3.5:9b"
+# model = "qwen3.5:9b"
 model = "llama3.1:8b"
 # model = 'aiasistentworld/Llama-3.1-8B-Instruct-STO-Master:latest'
 # model = "gemma3:4b"
