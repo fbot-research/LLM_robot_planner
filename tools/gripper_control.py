@@ -7,9 +7,9 @@ class GripperCommand(BaseModel):
 @tool(args_schema=GripperCommand)
 def close_gripper():
     print("Gripper closed.")
-    return {"status": "success", '__control__': 'continue'}
+    return {"status": "success", '__control__': 'done'}
 
 @tool(args_schema=GripperCommand)
 def open_gripper():
     print("Gripper opened.")
-    return {"status": "success", '__control__': 'continue'}
+    return {"status": "success", '__control__': 'done'}
