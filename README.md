@@ -1,4 +1,4 @@
-# LLM Robot Planner (AutoBot)
+# LLM Robot Planner
 
 Descrição
 ----
