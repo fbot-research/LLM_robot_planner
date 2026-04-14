@@ -35,16 +35,16 @@ Repository layout (high level)
 
 - Simple single-step command
 	1. User issues a straightforward request (e.g., "move the robot to waypoint A").
- 2. The system builds the `user prompt` (task + minimal context) and merges it with the `system prompt`.
- 3. The `input prompt` is sent to the local LLM, which returns JSON with an action like `{ "tool": "navigate_to", "args": {"point": "A"} }`.
- 4. The execution layer calls the `navigate_to` tool in `tools/`, monitors progress, and reports success or failure back to the context.
+    2. The system builds the `user prompt` (task + minimal context) and merges it with the `system prompt`.
+    3. The `input prompt` is sent to the local LLM, which returns JSON with an action like `{ "tool": "navigate_to", "args": {"point": "A"} }`.
+    4. The execution layer calls the `navigate_to` tool in `tools/`, monitors progress, and reports success or failure back to the context.
 
 - Iterative planning and execution (multi-step)
 	1. User requests a multi-step job (e.g., "inspect points A, B, and C and report any obstacles").
- 2. The orchestrator includes richer context (map fragments, previous observations) in the `user prompt`.
- 3. LLM returns a JSON plan with several ordered actions (perception calls, navigation calls, gripper manipulations).
- 4. The execution layer runs actions sequentially; after each action it appends results to the context and may re-invoke the LLM with updated context if the plan requires re-evaluation.
- 5. The loop continues until the plan completes or the `end condition` is triggered (success or stop).
+    2. The orchestrator includes richer context (map fragments, previous observations) in the `user prompt`.
+    3. LLM returns a JSON plan with several ordered actions (perception calls, navigation calls, gripper manipulations).
+    4. The execution layer runs actions sequentially; after each action it appends results to the context and may re-invoke the LLM with updated context if the plan requires re-evaluation.
+    5. The loop continues until the plan completes or the `end condition` is triggered (success or stop).
 
 ### Notes and extension points
 
