@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 host = "http://localhost:11434"
 
 # model = "granite4:3b"
-# model = "qwen3.5:9b"
-model = "llama3.1:8b"
+model = "qwen3.5:9b"
+model = "gemma4:e4b"
 # model = 'aiasistentworld/Llama-3.1-8B-Instruct-STO-Master:latest'
 # model = "gemma3:4b"
 
@@ -50,9 +50,14 @@ current_state = {
     }
 }
 
-user_prompt = "Get the tagged object on the "
+user_prompt = "Get the tagged object and place it on the table."
+finished = False
+iteration_counter = 0
+iteration_limit = 25
 
 built_msg = f"""
+
+{f'You have executed {iteration_counter} iterations so far. Your current state is:' if iteration_counter > 0 else ''}
 
 <|current_state|>
 {json.dumps(current_state, indent=2)}
@@ -71,9 +76,6 @@ print(f"Sending prompt to {model}...")
 # print("\nUser Prompt:")
 # print(built_msg)
 
-finished = False
-iteration_counter = 0
-iteration_limit = 25
 
 action_history = []
 
@@ -86,9 +88,32 @@ while not finished:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": built_msg},
         ],
+        think=True,
+        stream=True,
     )
 
-    plan = parse_ai_response(str(resp.message.content))
+    in_thinking = False
+
+    thinking = ''
+    response = ''
+    
+    for chunk in resp:
+        if chunk.message.thinking and not in_thinking:
+            in_thinking = True
+            print('Thinking:\n', end='')
+
+        if chunk.message.thinking:
+            print(chunk.message.thinking, end='')
+            thinking += chunk.message.thinking
+        elif chunk.message.content:
+            if in_thinking:
+                print('\n\nAnswer:\n', end='')
+                in_thinking = False
+            print(chunk.message.content, end='')
+            response += chunk.message.content
+
+    
+    plan = parse_ai_response(response)
 
 
     if plan is not None:
@@ -96,10 +121,10 @@ while not finished:
         print("Parsed LLM response as JSON:")
         print(json.dumps(plan, indent=2))
         # print(f"\n{'-'*50}\n")
-        # print(resp.message.content)
+        # print(final_resp.message.content)
     else:
         print("Could not parse LLM response as JSON. Raw response:")
-        print(resp.message.content)
+        print(final_resp.message.content)
         
         # TODO: ask the LLM to reformat
         
@@ -112,7 +137,7 @@ while not finished:
             plan = plan['actions']  # Extract actions list if wrapped in an "actions" field
         else:
             print("LLM response JSON does not contain 'action' or 'actions' field. Raw response:")
-            print(resp.message.content)
+            print(final_resp.message.content)
             plan = []  # Set to empty list to avoid processing
 
     for step in plan:
@@ -121,6 +146,8 @@ while not finished:
         params = step.get("parameters", {})
         result = execute_tool(action_name, params)
         
+        print(f'Executing action: {action_name}({params})')
+
         print(f"Result: {result}")
         action_history.append((action_name, params, result))
 
@@ -129,6 +156,8 @@ while not finished:
         {json.dumps(action_history, indent=2)}
         <|command_history|>
         """
+
+        # TODO: add a try and ask llm to fix if something goes wrong
 
         if result.get('__control__') == 'end_task':
             finished = True
@@ -154,6 +183,9 @@ while not finished:
             f.write(str(resp))
 
     with open("debug/response.txt", 'w') as f:
-        f.write(str(resp.message.content))
+        f.write(response)
+
+    with open("debug/thinking.txt", 'w') as f:
+        f.write(thinking)
 
 print("Finished executing plan.")
