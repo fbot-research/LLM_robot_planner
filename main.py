@@ -124,7 +124,7 @@ while not finished:
         # print(final_resp.message.content)
     else:
         print("Could not parse LLM response as JSON. Raw response:")
-        print(final_resp.message.content)
+        print(response)
         
         # TODO: ask the LLM to reformat
         
@@ -137,7 +137,7 @@ while not finished:
             plan = plan['actions']  # Extract actions list if wrapped in an "actions" field
         else:
             print("LLM response JSON does not contain 'action' or 'actions' field. Raw response:")
-            print(final_resp.message.content)
+            print(response)
             plan = []  # Set to empty list to avoid processing
 
     for step in plan:
