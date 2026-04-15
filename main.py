@@ -50,7 +50,7 @@ current_state = {
     }
 }
 
-user_prompt = "Get the tagged object and place it on the table."
+user_prompt = input("What task do you want the robot to perform? ")
 finished = False
 iteration_counter = 0
 iteration_limit = 25
