@@ -12,11 +12,7 @@ logger = logging.getLogger(__name__)
 # a production deployment via environment variables or a config file.
 host = "http://localhost:11434"
 
-# model = "granite4:3b"
-model = "qwen3.5:9b"
 model = "gemma4:e4b"
-# model = 'aiasistentworld/Llama-3.1-8B-Instruct-STO-Master:latest'
-# model = "gemma3:4b"
 
 client = ollama.Client(host=host)
 
