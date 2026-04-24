@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 # a production deployment via environment variables or a config file.
 host = "http://localhost:11434"
 
-model = "gemma4:e4b"
+model = "llama3.1:8b"
 
 client = ollama.Client(host=host)
 
@@ -40,9 +40,50 @@ print(f"Task: {user_prompt}")
 print(f"Sending prompt to {model}...")
 
 action_history = []
+thinking_supported = True
+
+
+def stream_chat_response(messages: list[dict], use_thinking: bool):
+    """Stream a chat response, optionally enabling model thinking output."""
+    chat_kwargs = {
+        "model": model,
+        # "format": "json",
+        "messages": messages,
+        "stream": True,
+    }
+    if use_thinking:
+        chat_kwargs["think"] = True
+
+    resp = client.chat(**chat_kwargs)
+
+    in_thinking = False
+    thinking_text = ''
+    response_text = ''
+
+    for chunk in resp:
+        thinking_chunk = getattr(chunk.message, "thinking", None)
+        content_chunk = getattr(chunk.message, "content", None)
+
+        if thinking_chunk and not in_thinking:
+            in_thinking = True
+            print('Thinking:\n', end='')
+
+        if thinking_chunk:
+            print(thinking_chunk, end='')
+            thinking_text += thinking_chunk
+        elif content_chunk:
+            if in_thinking:
+                print('\n\nAnswer:\n', end='')
+                in_thinking = False
+            print(content_chunk, end='')
+            response_text += content_chunk
+
+    return thinking_text, response_text
 
 while not finished:
 
+    update_state('places', {'Table A': {'x': 1.0, 'y': 2.0, 'z': 0.0}, 'Table B': {'x': -1.0, 'y': 3.0, 'z': 0.0}, 'Shelf': {'x': 2.0, 'y': -1.0, 'z': 1.0}})
+    update_state('objects', {'cube': {'position': {'x': 1.0, 'y': 1.9, 'z': 0.1}}, 'ball': {'position': {'x': 1.0, 'y': 2.2, 'z': 0.1}}})
     # Get the latest state from robot_state module
     current_state = get_state()
     
@@ -58,36 +99,25 @@ while not finished:
 The main task you need to accomplish is: {user_prompt}. Check if you haven't already accomplished part or all of it based on the current state and action history.
 """
     
-    resp = client.chat(
-        model=model,
-        # format="json",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": built_msg},
-        ],
-        think=True,
-        stream=True,
-    )
-
-    in_thinking = False
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": built_msg},
+    ]
 
     thinking = ''
     response = ''
-    
-    for chunk in resp:
-        if chunk.message.thinking and not in_thinking:
-            in_thinking = True
-            print('Thinking:\n', end='')
-
-        if chunk.message.thinking:
-            print(chunk.message.thinking, end='')
-            thinking += chunk.message.thinking
-        elif chunk.message.content:
-            if in_thinking:
-                print('\n\nAnswer:\n', end='')
-                in_thinking = False
-            print(chunk.message.content, end='')
-            response += chunk.message.content
+    if thinking_supported:
+        try:
+            thinking, response = stream_chat_response(messages, use_thinking=True)
+        except ollama.ResponseError as e:
+            if "does not support thinking" in str(e):
+                thinking_supported = False
+                print(f"\nModel '{model}' does not support thinking. Continuing without thinking mode.\n")
+                thinking, response = stream_chat_response(messages, use_thinking=False)
+            else:
+                raise
+    else:
+        thinking, response = stream_chat_response(messages, use_thinking=False)
 
     
     plan = parse_ai_response(response)
@@ -152,12 +182,7 @@ The main task you need to accomplish is: {user_prompt}. Check if you haven't alr
         finished = True
 
     with open("debug/raw_response.json", "w") as f:
-        if hasattr(resp, "model_dump"):
-            json.dump(resp.model_dump(), f, indent=2, default=str)
-        elif isinstance(resp, dict):
-            json.dump(resp, f, indent=2, default=str)
-        else:
-            f.write(str(resp))
+        f.write("Streaming response consumed; content persisted in debug/response.txt and debug/thinking.txt")
 
     with open("debug/response.txt", 'w') as f:
         f.write(response)
