@@ -5,7 +5,7 @@ import os
 import importlib
 from tool_registry import get_tools_schema, execute_tool
 from agent import parse_ai_response
-from robot_state import get_state
+from robot_state import get_state, update_state
 
 logger = logging.getLogger(__name__)
 
@@ -31,9 +31,6 @@ tools_for_llm = json.dumps(get_tools_schema(), indent=2)
 
 system_prompt = f"""{prompt}"""
 
-# TODO: get the current state from ROS topics instead of hardcoding it here. This is just an example.
-current_state = get_state()
-
 user_prompt = input("What task do you want the robot to perform? ")
 finished = False
 iteration_counter = 0
@@ -58,14 +55,12 @@ while not finished:
 {json.dumps(current_state, indent=2)}
 <|current_state|>
 
-<|user_request|>
-{user_prompt}
-<|user_request|>
+The main task you need to accomplish is: {user_prompt}. Check if you haven't already accomplished part or all of it based on the current state and action history.
 """
     
     resp = client.chat(
         model=model,
-        format="json",
+        # format="json",
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": built_msg},
@@ -171,3 +166,4 @@ while not finished:
         f.write(thinking)
 
 print("Finished executing plan.")
+print(action_history)
