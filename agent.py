@@ -1,6 +1,6 @@
 import logging, json
 
-def parse_ai_response(response_text: str) -> Optional[list[dict]]:
+def parse_ai_response(response_text: str) -> list[dict]:
     """Parse an LLM response string and return a JSON-like Python object.
 
     The function attempts multiple strategies to extract JSON from the raw
