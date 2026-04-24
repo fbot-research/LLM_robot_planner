@@ -11,7 +11,7 @@ class SaySchema(BaseModel):
 def ask_for_help(message: str):
     """Request human assistance for a specific issue or decision.
     
-    Pauses execution and prompts the user for input, allowing human intervention
+    Prompts the user for input, allowing human intervention
     when the agent encounters ambiguity, requires domain expertise, or needs
     clarification. The user's response is returned for the agent to process.
     
@@ -28,9 +28,7 @@ def ask_for_help(message: str):
 def say(message: str):
     """Output a message to communicate with the user.
     
-    Displays a message to the user, useful for providing status updates,
-    explanations of actions being taken, or any other communication
-    during task execution.
+    Displays a message to the user, but does not wait for a response.
     
     Args:
         message: The message text to output.
