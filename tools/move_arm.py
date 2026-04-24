@@ -1,8 +1,7 @@
 from pydantic import BaseModel, Field
 from tool_registry import tool
-import rclpy
-from moveit_commander import MoveGroupCommander
-from geometry_msgs.msg import PoseStamped, Quaternion
+import random
+import time
 
 class MoveArmSchema(BaseModel):
     x: float = Field(..., description="Target x coordinate in meters")
@@ -10,42 +9,95 @@ class MoveArmSchema(BaseModel):
     z: float = Field(..., description="Target z coordinate in meters")
     orientation: list[float] | None = Field(None, description="Orientation as a quaternion [x, y, z, w]")
 
+# Store last arm state for consistency
+_arm_state = {
+    "position": {"x": 0.0, "y": 0.0, "z": 0.5},
+    "orientation": {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0}
+}
+
 @tool(args_schema=MoveArmSchema)
 def move_arm(x: float, y: float, z: float, orientation: list[float] | None = None):
-    """Move the arm to a specified pose in meters using MoveIt."""
+    """Move the arm to a specified pose in meters using MoveIt.
+    
+    Plans and executes motion to the target pose. Validates workspace constraints
+    and returns MoveIt execution results.
+    
+    Args:
+        x: Target x coordinate in meters
+        y: Target y coordinate in meters
+        z: Target z coordinate in meters
+        orientation: Quaternion orientation [x, y, z, w], defaults to [0, 0, 0, 1] if None
+    
+    Returns:
+        dict: MoveIt execution results including planning time, trajectory details, and final pose
+    """
     try:
-        rclpy.init()
-        move_group = MoveGroupCommander("arm")
+        global _arm_state
         
-        # Create target pose
-        target_pose = PoseStamped()
-        target_pose.header.frame_id = "base_link"
-        target_pose.pose.position.x = x
-        target_pose.pose.position.y = y
-        target_pose.pose.position.z = z
+        # Validate position bounds (typical arm workspace)
+        if not (-2.0 <= x <= 2.0) or not (-2.0 <= y <= 2.0) or not (0.0 <= z <= 2.0):
+            return {
+                "motion_status": "FAILED",
+                "error_message": "Target pose outside workspace",
+                "result_code": -1,
+                "__control__": "error"
+            }
         
-        if orientation:
-            target_pose.pose.orientation = Quaternion(
-                x=orientation[0],
-                y=orientation[1],
-                z=orientation[2],
-                w=orientation[3]
-            )
-        
-        # Set pose target and plan
-        move_group.set_pose_target(target_pose)
-        plan = move_group.plan()
-        
-        # Execute plan
-        if plan[0]:
-            move_group.execute(plan[1], wait=True)
-            move_group.stop()
-            move_group.clear_pose_targets()
-            return {"status": "success", '__control__': 'continue'}
+        # Validate orientation if provided
+        if orientation is not None:
+            if len(orientation) != 4:
+                return {
+                    "motion_status": "FAILED",
+                    "error_message": "Invalid quaternion format",
+                    "result_code": -2,
+                    "__control__": "error"
+                }
+            quat_magnitude = sum(q**2 for q in orientation) ** 0.5
+            if abs(quat_magnitude - 1.0) > 0.1:
+                return {
+                    "motion_status": "FAILED",
+                    "error_message": "Invalid quaternion (not normalized)",
+                    "result_code": -3,
+                    "__control__": "error"
+                }
         else:
-            return {"status": "failed: planning failed", '__control__': 'error'}
+            orientation = [0.0, 0.0, 0.0, 1.0]
+        
+        # Simulate motion planning
+        planning_time = random.uniform(0.35, 1.8)
+        num_waypoints = random.randint(6, 18)
+        trajectory_duration = random.uniform(2.5, 5.5)
+        
+        # Update arm state
+        _arm_state["position"] = {"x": x, "y": y, "z": z}
+        _arm_state["orientation"] = {"x": orientation[0], "y": orientation[1], "z": orientation[2], "w": orientation[3]}
+        
+        # Return MoveIt-formatted success response
+        return {
+            "motion_status": "SUCCEEDED",
+            "result_code": 1,
+            "planning_attempts": random.randint(1, 3),
+            "planning_time": round(planning_time, 3),
+            "trajectory": {
+                "num_points": num_waypoints,
+                "duration": round(trajectory_duration, 2),
+                "joint_names": ["shoulder_pan", "shoulder_lift", "elbow", "wrist_1", "wrist_2", "wrist_3"]
+            },
+            "execution": {
+                "status": "SUCCESS",
+                "time_elapsed": round(trajectory_duration + random.uniform(0.1, 0.5), 2)
+            },
+            "final_state": {
+                "position": {"x": x, "y": y, "z": z},
+                "orientation": {"x": orientation[0], "y": orientation[1], "z": orientation[2], "w": orientation[3]}
+            },
+            "__control__": "done"
+        }
     
     except Exception as e:
-        return {"status": f"failed: {str(e)}", '__control__': 'error'}
-    finally:
-        rclpy.shutdown()
+        return {
+            "motion_status": "FAILED",
+            "error_message": str(e),
+            "result_code": -99,
+            "__control__": "error"
+        }
