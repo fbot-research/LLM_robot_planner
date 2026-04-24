@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from tool_registry import tool
+from robot_state import update_state
 import random
 import math
 
@@ -8,13 +9,6 @@ class NavigateToSchema(BaseModel):
     y: float = Field(..., description="Target y coordinate")
     z: float = Field(..., description="Target z coordinate")
     orientation: list[float] = Field(..., description="Quaternion [x, y, z, w]")
-
-# Store robot state for consistency
-_robot_state = {
-    "position": {"x": 0.0, "y": 0.0, "z": 0.0},
-    "orientation": {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0},
-    "map_frame": "map"
-}
 
 @tool(args_schema=NavigateToSchema)
 def navigate_to(x: float, y: float, z: float, orientation: list[float]):
@@ -51,25 +45,16 @@ def navigate_to(x: float, y: float, z: float, orientation: list[float]):
                 "__control__": "error"
             }
         
-        # Calculate distance from current position
-        current_x = _robot_state["position"]["x"]
-        current_y = _robot_state["position"]["y"]
-        distance = math.sqrt((x - current_x)**2 + (y - current_y)**2)
-        
         # Simulate path planning
         planning_time = random.uniform(0.2, 1.5)
-        num_waypoints = max(3, int(distance * 3) + random.randint(2, 5))
+        num_waypoints = max(3, int(distance * 3) + random.randint(2, 5)) if (distance := math.sqrt((x)**2 + (y)**2)) else 3
+        distance = math.sqrt(x**2 + y**2)
         path_length = distance + random.uniform(0.1, 0.5)  # Account for non-straight paths
         estimated_time = path_length / random.uniform(0.4, 0.8)  # Speed 0.4-0.8 m/s
         
-        # Update robot state
-        _robot_state["position"] = {"x": x, "y": y, "z": z}
-        _robot_state["orientation"] = {
-            "x": orientation[0],
-            "y": orientation[1],
-            "z": orientation[2],
-            "w": orientation[3]
-        }
+        # Update shared robot state on successful navigation
+        update_state('current_position', {'x': x, 'y': y, 'z': z})
+        update_state('current_orientation', {'x': orientation[0], 'y': orientation[1], 'z': orientation[2], 'w': orientation[3]})
         
         # Return authentic Nav2 response
         return {

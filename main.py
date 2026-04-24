@@ -5,6 +5,7 @@ import os
 import importlib
 from tool_registry import get_tools_schema, execute_tool
 from agent import parse_ai_response
+from robot_state import get_state
 
 logger = logging.getLogger(__name__)
 
@@ -31,27 +32,25 @@ tools_for_llm = json.dumps(get_tools_schema(), indent=2)
 system_prompt = f"""{prompt}"""
 
 # TODO: get the current state from ROS topics instead of hardcoding it here. This is just an example.
-current_state = {
-    "current_position": {"x": 0.0, "y": 0.0, "z": 0.0},
-    "current_orientation": {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0},
-    "gripped_object": None,
-    "gripper_state": "open",
-    "environment": {
-        "objects": [
-            {"id": "object1", "type": "box", "position": {"x": 1.0, "y": 1.0, "z": 0.0}}
-        ],
-        "places": [
-            {"id": "place1", "type": "table", "position": {"x": 2.0, "y": 2.0, "z": 0.0}}
-        ]
-    }
-}
+current_state = get_state()
 
 user_prompt = input("What task do you want the robot to perform? ")
 finished = False
 iteration_counter = 0
 iteration_limit = 25
 
-built_msg = f"""
+print(f"Task: {user_prompt}")
+print(f"Sending prompt to {model}...")
+
+action_history = []
+
+while not finished:
+
+    # Get the latest state from robot_state module
+    current_state = get_state()
+    
+    # Build the message with latest state for each iteration
+    built_msg = f"""
 
 {f'You have executed {iteration_counter} iterations so far. Your current state is:' if iteration_counter > 0 else ''}
 
@@ -63,20 +62,7 @@ built_msg = f"""
 {user_prompt}
 <|user_request|>
 """
-
-# print(built_msg)
-print(f"Task: {user_prompt}")
-print(f"Sending prompt to {model}...")
-# print("System Prompt:")
-# print(system_prompt)
-# print("\nUser Prompt:")
-# print(built_msg)
-
-
-action_history = []
-
-while not finished:
-
+    
     resp = client.chat(
         model=model,
         format="json",

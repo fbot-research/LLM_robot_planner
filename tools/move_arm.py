@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from tool_registry import tool
+from robot_state import update_state
 import random
 import time
 
@@ -8,12 +9,6 @@ class MoveArmSchema(BaseModel):
     y: float = Field(..., description="Target y coordinate in meters")
     z: float = Field(..., description="Target z coordinate in meters")
     orientation: list[float] | None = Field(None, description="Orientation as a quaternion [x, y, z, w]")
-
-# Store last arm state for consistency
-_arm_state = {
-    "position": {"x": 0.0, "y": 0.0, "z": 0.5},
-    "orientation": {"x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0}
-}
 
 @tool(args_schema=MoveArmSchema)
 def move_arm(x: float, y: float, z: float, orientation: list[float] | None = None):
@@ -68,9 +63,9 @@ def move_arm(x: float, y: float, z: float, orientation: list[float] | None = Non
         num_waypoints = random.randint(6, 18)
         trajectory_duration = random.uniform(2.5, 5.5)
         
-        # Update arm state
-        _arm_state["position"] = {"x": x, "y": y, "z": z}
-        _arm_state["orientation"] = {"x": orientation[0], "y": orientation[1], "z": orientation[2], "w": orientation[3]}
+        # Update shared robot state on successful motion
+        update_state('arm_position', {'x': x, 'y': y, 'z': z})
+        update_state('arm_orientation', {'x': orientation[0], 'y': orientation[1], 'z': orientation[2], 'w': orientation[3]})
         
         # Return MoveIt-formatted success response
         return {

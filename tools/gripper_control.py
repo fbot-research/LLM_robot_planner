@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from tool_registry import tool
+from robot_state import update_state
 
 class GripperCommand(BaseModel):
     pass  # No parameters needed for this simple command
@@ -16,6 +17,7 @@ def close_gripper():
         dict: Status of the gripper closing operation.
     """
     print("Gripper closed.")
+    update_state('gripper_state', 'closed')
     return {"status": "success", '__control__': 'done'}
 
 @tool(args_schema=GripperCommand)
@@ -30,4 +32,5 @@ def open_gripper():
         dict: Status of the gripper opening operation.
     """
     print("Gripper opened.")
+    update_state('gripper_state', 'open')
     return {"status": "success", '__control__': 'done'}
